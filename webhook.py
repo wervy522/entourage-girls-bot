@@ -12,19 +12,35 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Загрузка конфигурации
-with open('config.json', 'r', encoding='utf-8') as f:
-    config = json.load(f)
+# Получение конфигурации из переменных окружения
+LAVA_API_KEY = os.environ.get('LAVA_API_KEY')
+GOOGLE_SHEET_NAME = os.environ.get('GOOGLE_SHEET_NAME')
 
-LAVA_API_KEY = config['LAVA_API_KEY']
-GOOGLE_SHEET_NAME = config['GOOGLE_SHEET_NAME']
+if not LAVA_API_KEY or not GOOGLE_SHEET_NAME:
+    raise ValueError("Необходимо установить переменные окружения LAVA_API_KEY и GOOGLE_SHEET_NAME")
 
 # Настройка доступа к Google Sheets
 scope = ['https://spreadsheets.google.com/feeds',
          'https://www.googleapis.com/auth/drive']
-credentials = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-gc = gspread.authorize(credentials)
-sheet = gc.open(GOOGLE_SHEET_NAME).sheet1
+
+# Получение учетных данных Google из переменной окружения
+GOOGLE_CREDENTIALS = os.environ.get('GOOGLE_CREDENTIALS')
+if not GOOGLE_CREDENTIALS:
+    raise ValueError("Необходимо установить переменную окружения GOOGLE_CREDENTIALS")
+
+# Создаем временный файл с учетными данными
+import tempfile
+with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp:
+    temp.write(GOOGLE_CREDENTIALS)
+    temp_path = temp.name
+
+try:
+    credentials = ServiceAccountCredentials.from_json_keyfile_name(temp_path, scope)
+    gc = gspread.authorize(credentials)
+    sheet = gc.open(GOOGLE_SHEET_NAME).sheet1
+finally:
+    # Удаляем временный файл
+    os.unlink(temp_path)
 
 app = Flask(__name__)
 
